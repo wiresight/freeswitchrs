@@ -111,8 +111,18 @@ impl EventHeader {
     }
 }
 
+pub struct EventNode(*mut fsr::event_node);
+impl EventNode {
+    pub fn event_unbind(self) {
+        let mut enode = self.0;
+        unsafe {
+            fsr::event_unbind(&mut enode);
+        }
+    }
+}
+
 pub fn event_bind<F>(id: &str, event: fsr::event_types, subclass_name: Option<&str>, callback: F)
-    -> u64
+    -> EventNode
     where F: Fn(Event)
 {
     // TODO: Can you modify events in the callback?
@@ -131,20 +141,14 @@ pub fn event_bind<F>(id: &str, event: fsr::event_types, subclass_name: Option<&s
     let id = fsr::str_to_ptr(id);
     let subclass_name = subclass_name.map_or(std::ptr::null(), |x| fsr::str_to_ptr(x));
     unsafe {
-        let mut enode = 0 as *mut u64;
+        let mut enode : *mut fsr::event_node = std::ptr::null_mut();
         fsr::event_bind_removable(id,
                                   event,
                                   subclass_name,
                                   Some(wrap_callback::<F>),
                                   fp as *mut libc::c_void,
-                                  (&mut enode) as *mut _ as *mut *mut fsr::event_node);
-        enode as u64
+                                  &mut enode);
+        EventNode(enode)
     }
 }
 
-pub fn event_unbind(id: u64) {
-    let mut enode = id as *mut u64;
-    unsafe {
-        fsr::event_unbind((&mut enode) as *mut _ as *mut *mut fsr::event_node);
-    }
-}
